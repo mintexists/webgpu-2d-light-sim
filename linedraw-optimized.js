@@ -9,6 +9,9 @@ export class LineDraw {
     }
 
     async init () {
+        if (!navigator.gpu) {
+            alert("WebGPU not supported. Will not work")
+        }        
         this.adapter = await navigator.gpu.requestAdapter();
         this.device = await this.adapter.requestDevice();
         if (!this.device) {

@@ -12,6 +12,9 @@ await linedraw.init();
 
 let deg = (deg) => deg * Math.PI / 180;
 
+if (!navigator.gpu) {
+    alert("WebGPU not supported")
+}
 const adapter = await navigator.gpu.requestAdapter();
 const device = await adapter.requestDevice();
 if (!device) {

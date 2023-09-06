@@ -1,6 +1,6 @@
 import toColor from 'https://esm.sh/color-spectrum@1.1.3';
 
-let mapRange = (value, low1, high1, low2, high2) => {
+export let mapRange = (value, low1, high1, low2, high2) => {
     return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
 }
 
@@ -107,7 +107,7 @@ export class Ray {
     }
 
     static fromArray(arr) {
-        let ray = new Ray(arr[0], arr[1], arr[2], arr[3], 0);
+        let ray = new Ray(arr[0], arr[1], arr[2], arr[3], 0, arr[6]);
         ray.x2 = arr[4];
         ray.y2 = arr[5];
         return ray;

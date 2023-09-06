@@ -14,7 +14,13 @@ struct Ray {
     a: f32,
 }
 
-fn Intersect(line: Line, ray: Ray) -> vec2<f32> {
+struct Intersection {
+    position: vec2<f32>,
+    t: f32,
+    u: f32,
+}
+
+fn Intersect(line: Line, ray: Ray) -> Intersection {
     let u0 = ray.position.x;
     let u1 = ray.direction.x;
     let v0 = ray.position.y;
@@ -33,11 +39,16 @@ fn Intersect(line: Line, ray: Ray) -> vec2<f32> {
     
     let intersection = line.p1 + t * (line.p2 - line.p1);
 
-    if (t >= 0.0 && t <= 1.0 && u > 0.001) {
-        return intersection;
+    if (t >= 0.0 && t < 1.0 && u > 0.001) {
+        return Intersection(intersection, t, u);
     } else {
-        return vec2(-1.0, -1.0);
+        return Intersection(vec2(-1.0, -1.0), t, u);
     }
+}
+
+fn GoldNoise(xy: vec2f, seed: f32) -> f32 {
+    let PHI: f32 = 1.61803398874989484820459;
+    return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
 }
 
 fn Normal(line: Line, ray: Ray) -> vec2<f32> {
@@ -54,13 +65,24 @@ fn Normal(line: Line, ray: Ray) -> vec2<f32> {
 
 fn WavelengthToIOR(w: f32) -> f32 {
     let wavelength = w / 1000;
-    let b1 = 1.03961212;
-    let b2 = 0.231792344;
-    let b3 = 1.01046945;
+    // // BK57 Glass
+    // let b1 = 1.03961212;
+    // let b2 = 0.231792344;
+    // let b3 = 1.01046945;
 
-    let c1 = 6.00069867 * pow(10.0, -3.0);
-    let c2 = 2.00179144 * pow(10.0, -2.0);
-    let c3 = 1.03560653 * pow(10.0, 2.0);
+    // let c1 = 6.00069867 * pow(10.0, -3.0);
+    // let c2 = 2.00179144 * pow(10.0, -2.0);
+    // let c3 = 1.03560653 * pow(10.0, 2.0);
+
+    // Diamond
+    let b1 = 4.3356;
+    let b2 = 0.3306;
+    let b3 = 0.0;
+
+    let c1 = 0.106 * pow(10.0, 2.0);
+    let c2 = 0.0175 * pow(10.0, 2.0);
+    let c3 = 1.0 * pow(10.0, 2.0);
+
 
     let w2 = pow(wavelength, 2.0);
 
@@ -70,6 +92,15 @@ fn WavelengthToIOR(w: f32) -> f32 {
 
     return n;
 }
+
+fn mapRange(value: f32, low1: f32, high1: f32, low2: f32, high2: f32) -> f32 {
+    return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
+}
+
+fn lerp(a: vec2<f32>, b: vec2<f32>, t: f32) -> vec2<f32> {
+    return (1 - t) * a + t *  b;
+}
+
 
 @group(0) @binding(0) var<storage, read_write> lines : array<Line>;
 @group(0) @binding(1) var<storage, read_write> rays : array<Ray>;
@@ -82,21 +113,19 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var ray = rays[global_id.x];
     var maxDistance = 100000.0;
     var hit: vec2<f32> = vec2(-1.0, -1.0);
+    var t: f32;
+    var hitIndex: u32;
     var lineHit: Line;
     for (var i: u32 = 0; i < linesLength; i++) {
         let intersection = Intersect(lines[i], ray);
-        let intersectionDistance = distance(ray.position, intersection);
-        if (intersection.x != -1.0 && intersection.y != -1.0) {
-        // if (intersection.x != -1.0 && intersection.y != -1.0 && floor(intersection.x) != floor(ray.position.x) && floor(intersection.y) != floor(ray.position.y)) {
-            // if (lines[i].isGlass != 0) { // if is glass
-            //     if (floor(intersection.x) == floor(ray.position.x) && floor(intersection.y) == floor(ray.position.y)) {
-            //         continue;
-            //     }
-            // }
+        let intersectionDistance = distance(ray.position, intersection.position);
+        if (intersection.position.x != -1.0 && intersection.position.y != -1.0) {
             if (intersectionDistance < maxDistance) {
                 maxDistance = intersectionDistance;
-                hit = intersection;
+                hit = intersection.position;
                 lineHit = lines[i];
+                hitIndex = i;
+                t = intersection.t;
             }
         }
     }
@@ -109,14 +138,67 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
         return;
     }
 
-    // if (floor(hit.x) == floor(ray.position.x) && floor(hit.y) == floor(ray.position.y)) {
-    //     ray.wavelength = 440.0;
-    // }
+    // use angle between vectors to check if should interpolate
 
-    // ok do the new stuff here
+    // first find the lines with points at the same position as this
+    // or just use sequential after if im lazy - maybe hybrid approach?
+    // this might end up being the hardest part here
 
-    let normal = Normal(lineHit, ray);
-    if (lineHit.isGlass != 0.0) {
+    var prevLine: Line = lineHit;
+    var nextLine: Line = lineHit;
+    if (lines[hitIndex-1].p2.x == lineHit.p1.x && lines[hitIndex-1].p2.y == lineHit.p1.y) {
+        prevLine = lines[hitIndex-1];
+    } else {
+        for (var i: u32 = 0; i < linesLength; i++) {
+            if (i == hitIndex) {
+                continue;
+            }
+            if (lines[i].p2.x == lineHit.p1.x && lines[i].p2.y == lineHit.p1.y) {
+                prevLine = lines[i];
+            }
+        }
+    }
+    if (lines[hitIndex+1].p1.x == lineHit.p2.x && lines[hitIndex+1].p1.y == lineHit.p2.y) {
+        nextLine = lines[hitIndex+1];
+    } else {
+        for (var i: u32 = 0; i < linesLength; i++) {
+            if (i == hitIndex) {
+                continue;
+            }
+            if (lines[i].p1.x == lineHit.p2.x && lines[i].p1.y == lineHit.p2.y) {
+                nextLine = lines[i];
+            }
+        }
+    }
+
+    var prevNormal = Normal(prevLine, ray);
+    var currNormal = Normal(lineHit, ray);
+    var nextNormal = Normal(nextLine, ray);
+
+    let prevAngle = acos(dot(prevNormal, currNormal) / (length(prevNormal) * length(currNormal)));
+    let nextAngle = acos(dot(nextNormal, currNormal) / (length(nextNormal) * length(currNormal)));
+    if (prevAngle > 30 * 3.14159265359 / 180) {
+        prevNormal = currNormal;
+    }
+    if (nextAngle > 30 * 3.14159265359 / 180) {
+        nextNormal = currNormal;
+    }
+
+
+    var normal: vec2<f32>;
+    if (t >= .5) {
+        normal = lerp(currNormal, nextNormal, mapRange(t, .5, 1, 0, .5));
+    } else {
+        normal = lerp(currNormal, prevNormal, mapRange(t, .5, 0, 0, .5));
+    }
+
+    normal = normalize(normal);
+
+    // var shouldStillReflect = GoldNoise(hit * 100, 1.1) > .1;
+    let shouldStillReflect = true;
+
+    // if is glass
+    if (lineHit.isGlass != 0.0 && shouldStillReflect) {
         var n1: f32;
         var n2: f32;
         if (ray.currentIor == 1.0) {
@@ -129,41 +211,44 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
         let l = normalize(ray.direction - ray.position);
         let r = n1 / n2;
-        let c = dot(normal, l);
+        let c = dot(-normal, l);
 
-        var v = (r * l) + ((r * c - sqrt(abs((1 - pow(r, 2.0)) * (1 - pow(c, 2.0))))) * normal);
+        var v = (r * l) + (
+            (r * c) - 
+            sqrt(
+                abs(
+                    1 - 
+                    (
+                        pow(r, 2.0) * 
+                        (
+                            1 -
+                            pow(c, 2.0)
+                        )
+                    )
+                )
+            )
+        ) * normal;
 
-        // v = normalize(v);
+
+        v = normalize(v);
         
 
         ray.position = hit;
         ray.direction = v + ray.position;
+        ray.a = ray.currentIor;
         ray.currentIor = n2;
-        ray.intensity *= 1.0 - line.absorbtion;
-        // if is glass do the shit
-
+        ray.intensity *= 1.0 - lineHit.absorbtion;
     } else {
-        // otherwise dont do the shit
-        // wait do i need to have rays store if they are in glass the whole time
-        // because that would be annoying
-        // ohno i think i might
-        // thats annoying ill do that later
-
         let reflection = normalize(ray.direction - ray.position) - (2 * dot(normalize(ray.direction - ray.position), normal) * normal);
         ray.position = hit;
         ray.direction = reflection + ray.position;
-        if (line.absorbtion >= 0.99) {
+        if (lineHit.absorbtion >= 0.99) {
             ray.intensity = 0;
         } else {
-            ray.intensity *= 1.0 - line.absorbtion;
+            ray.intensity *= 1.0 - lineHit.absorbtion;
         }
     }
 
-    // ray.direction = hit;
-
-    // ray.direction = ray.direction - ray.position;
-    // ray.direction *= 100.0;
-    // ray.direction += ray.position;
     newRays[global_id.x] = ray;
 }
 

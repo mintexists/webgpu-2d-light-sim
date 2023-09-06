@@ -1,0 +1,38 @@
+<span class="grid">
+    <div class="embed-wrapper">
+        <embed src="http://localhost:8080/" id="embed"></embed>
+    </div>
+    <div id="calculator"></div>
+</span>
+<script src="https://www.desmos.com/api/v1.8/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+<script src="./desmos.js" type="module"></script>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background: black;
+    }
+
+    #embed {
+        aspect-ratio: 1;
+        width: 100%;
+    }
+
+    .embed-wrapper {
+        width: 50%;
+        resize: horizontal;
+        overflow: hidden;
+        height: min-content;
+    }
+
+    .grid {
+        display: flex;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    #calculator {
+        flex-grow: 1;
+    }
+</style>

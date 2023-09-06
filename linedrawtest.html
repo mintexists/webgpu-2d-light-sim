@@ -1,0 +1,49 @@
+<canvas id="canvas"></canvas>
+<script type="module">
+import { LineDraw } from './linedraw-optimized.js';
+import { mapRange } from './helpers.js';
+let linedrawer = new LineDraw(document.getElementById('canvas'), 1000);
+canvas.width = 1000;
+canvas.height = 1000;
+await linedrawer.init();
+
+document.addEventListener('keydown', async e => {
+    if (e.key == ' ') {
+        e.preventDefault();
+        let count = 1000;
+        for (let i = 0; i < count; i++) {
+            linedrawer.addToQueue([
+                Math.random() * linedrawer.canvas.width,
+                Math.random() * linedrawer.canvas.height,
+                Math.random() * linedrawer.canvas.width,
+                Math.random() * linedrawer.canvas.height,
+                Math.random(),
+                Math.random(),
+                Math.random(),
+                mapRange(Math.random(), 0, 1, .5, 1)
+            ]);
+        }
+        let t = performance.now();
+        console.log(await linedrawer.draw())
+        console.log(performance.now() - t)
+        console.log('done')
+    } 
+    if (e.key == 'e') {
+        e.preventDefault();
+        await linedrawer.render();
+    }
+})
+</script>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background: black;
+    }
+
+    canvas {
+        width: 100vmin;
+        background: black;
+    }
+</style>

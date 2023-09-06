@@ -1,28 +1,16 @@
 import {Ray, Line, pointLight, DrawLine, polygon, beam} from './helpers.js';
-import toColor from 'https://esm.sh/color-spectrum@1.1.3';
-import { LineDraw } from './linedraw.js';
+import { LoadSVG } from './svg/main.js';
+import toColor from 'https://esm.sh/color-spectrum?bundle';
+import { LineDraw } from './linedraw-optimized.js';
 /** @type {HTMLCanvasElement} */
 let canvas = document.getElementById("canvas");
-// let ctx = canvas.getContext("2d");
-let size = 2000;
+let size = 4000;
 canvas.width = size;
 canvas.height = size;
-let linedraw = new LineDraw(canvas, 1000);
+let linedraw = new LineDraw(canvas, 10000);
 await linedraw.init();
-// ctx.fillStyle = "black";
-// ctx.fillRect(0, 0, size, size);
+
 let deg = (deg) => deg * Math.PI / 180;
-// let imageDataReal = ctx.getImageData(0, 0, size, size);
-// let imageData = new Float32Array(imageDataReal.data.length);
-// for (let i = 0; i < imageData.length; i++) {
-//     imageData[i] = imageDataReal.data[i];
-// }
-// let putImageData = () => {
-//     for (let i = 0; i < imageData.length; i++) {
-//         imageDataReal.data[i] = imageData[i];
-//     }
-//     ctx.putImageData(imageDataReal, 0, 0);
-// }   
 
 const adapter = await navigator.gpu.requestAdapter();
 const device = await adapter.requestDevice();
@@ -77,6 +65,12 @@ let rays = [
     // ...beam(10, 500, 200, 10000, 100, deg(0))
     
 ];
+
+// LOAD THE SVG HERE
+// let inputs = await LoadSVG(await fetch('./svg/input.svg').then(r=>r.text()))
+let inputs = await LoadSVG(localStorage.getItem('svg'))
+rays = inputs.rays;
+lines = inputs.lines;
 
 let linesFloat32 = new Float32Array(lines.length * Line.size);
 for (let i = 0; i < lines.length; i++) {
@@ -233,25 +227,34 @@ let compute = async () => {
 // await compute();
 // console.log(performance.now()-time)
 
+let t = performance.now();
 let max = 500;
 let i = 0;
 
+let paused=false;
+
 let loop = async () => {
     console.log(i)
-    if (i++ > max) return;
+    if (i++ > max) {
+        console.log("done in ", performance.now() - t)
+        return;
+    };
     let time = performance.now();
     await compute();
     console.log(performance.now()-time)
-    requestAnimationFrame(loop);
+    if (!paused) requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+if (!paused) requestAnimationFrame(loop);
 
 document.addEventListener("keydown", async e => {
     if (e.key == " ") {
-        let time = performance.now();
-        await compute();
-        console.log(performance.now()-time)
+        // e.preventDefault();
+        // let time = performance.now();
+        // await compute();
+        // console.log(performance.now()-time)
+        paused=!paused
+        if (!paused) requestAnimationFrame(loop);
         // console.log('a')
     }
 })

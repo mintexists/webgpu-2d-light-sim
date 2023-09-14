@@ -4,7 +4,7 @@ import toColor from 'https://esm.sh/color-spectrum?bundle';
 import { LineDraw } from './linedraw-optimized.js';
 /** @type {HTMLCanvasElement} */
 let canvas = document.getElementById("canvas");
-let size = 4000;
+let size = 2000;
 canvas.width = size;
 canvas.height = size;
 let linedraw = new LineDraw(canvas, 10000);
